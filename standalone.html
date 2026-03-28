@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terraform Runner - Davinci AI Buildboard</title>
+    <style>
+      :root {
+        --bg: #f4f7fb;
+        --surface: #ffffff;
+        --ink: #172033;
+        --muted: #617089;
+        --line: #d7dfed;
+        --accent: #0f766e;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at top left, #e8f7ff, var(--bg) 45%);
+        color: var(--ink);
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+      .content {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 1.25rem;
+      }
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 1rem;
+        box-shadow: 0 10px 30px rgba(23, 32, 51, 0.04);
+      }
+      .panel-header h2 { margin: 0; }
+      .panel-header p {
+        margin: 0.4rem 0 0;
+        color: var(--muted);
+      }
+      .placeholder-card {
+        margin-top: 1rem;
+        border: 1px dashed #a6b5cc;
+        border-radius: 12px;
+        padding: 1rem;
+      }
+      .action-btn {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+        color: var(--ink);
+        padding: 0.6rem 0.75rem;
+        font-size: 0.9rem;
+        cursor: pointer;
+      }
+      .action-btn:hover {
+        border-color: #9fb9dd;
+      }
+      code {
+        background: #eef3fb;
+        padding: 0.1rem 0.25rem;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="standalone-app-root" class="content"></main>
+    <script type="module">
+      function resolvePackage(mod) {
+        let pkg = mod.appPackage ?? mod.default ?? null;
+        if (!pkg) {
+          for (const value of Object.values(mod)) {
+            if (value && typeof value === "object" && typeof value.render === "function") {
+              pkg = value;
+              break;
+            }
+          }
+        }
+        return pkg;
+      }
+
+      function renderError(container, message) {
+        container.innerHTML = `
+          <section class="panel app-view">
+            <header class="panel-header">
+              <h2>Standalone App Failed</h2>
+              <p>${message}</p>
+            </header>
+            <div class="placeholder-card">
+              <h3>Expected Module Contract</h3>
+              <p>Export <code>appPackage</code> or default with <code>render(container)</code>.</p>
+            </div>
+          </section>
+        `;
+      }
+
+      async function mountStandaloneApp(modulePath, mountId = "standalone-app-root") {
+        const container = document.getElementById(mountId);
+        if (!container) {
+          return;
+        }
+
+        try {
+          const resolvedModuleUrl = new URL(modulePath, window.location.href).href;
+          const mod = await import(resolvedModuleUrl);
+          const pkg = resolvePackage(mod);
+
+          if (!pkg || typeof pkg.render !== "function") {
+            throw new Error("Module must export appPackage/default (or named export) with render(container).");
+          }
+
+          const title = String(pkg.name || "Standalone App");
+          document.title = `${title} - Davinci AI Buildboard`;
+
+          pkg.render(container, {
+            app: {
+              id: "standalone",
+              name: String(pkg.name || "Standalone App"),
+              description: String(pkg.description || ""),
+              version: String(pkg.version || ""),
+              sourceType: "standalone",
+              source: resolvedModuleUrl,
+              active: true,
+            },
+            standalone: true,
+          });
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : "Unknown error while loading app module.";
+          renderError(container, detail);
+        }
+      }
+
+      const moduleUrl = new URL("./index.js", window.location.href);
+      moduleUrl.searchParams.set("v", String(Date.now()));
+      mountStandaloneApp(moduleUrl.href);
+    </script>
+  </body>
+</html>
